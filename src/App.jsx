@@ -29,11 +29,8 @@ const CONFIG = {
     },
   ],
   timeSlots: [
-    "Sáng (07:00 - 08:00)",
-    "Sáng (08:00 - 09:00)",
-    "Sáng (09:00 - 10:00)",
-    "Sáng (10:00 - 11:00)",
-    "Chiều (13:00 - 14:00)",
+    "Sáng (07:00 - 09:00)",
+    "Sáng (09:00 - 11:00)",
     "Chiều (14:00 - 15:00)",
     "Chiều (15:00 - 16:00)",
   ],
@@ -888,21 +885,21 @@ function Step3_Employee({ onNext, onBookingData, initialData, userEmail }) {
       <div style={{ border: `1px solid ${palette.border}`, borderTop: "none", borderRadius: "0 0 8px 8px", padding: 20, marginBottom: 4 }}>
         <div className="grid-3col" style={{ marginBottom: 16 }}>
           <div>
-            <label style={fieldLabel}>Tỉnh / Thành phố</label>
+            <label style={fieldLabel}>Tỉnh / Thành phố <span style={{ color: palette.danger }}>*</span></label>
             <select style={{ ...fieldSelect, borderColor: errors.booking && !city ? palette.danger : palette.border }} value={city} onChange={(e) => { setCity(e.target.value); setHospital(""); clearError("booking"); }}>
               <option value="">Chọn Tỉnh/Thành phố</option>
               {CONFIG.cities.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
           </div>
           <div>
-            <label style={fieldLabel}>Bệnh viện / Phòng khám</label>
+            <label style={fieldLabel}>Bệnh viện / Phòng khám <span style={{ color: palette.danger }}>*</span></label>
             <select style={{ ...fieldSelect, borderColor: errors.booking && !hospital ? palette.danger : palette.border }} value={hospital} onChange={(e) => { setHospital(e.target.value); clearError("booking"); }} disabled={!city}>
               <option value="">Chọn Bệnh viện / Phòng khám</option>
               {hospitals.map((h) => <option key={h} value={h}>{h}</option>)}
             </select>
           </div>
           <div>
-            <label style={fieldLabel}>Ngày khám</label>
+            <label style={fieldLabel}>Ngày khám <span style={{ color: palette.danger }}>*</span></label>
             <select style={{ ...fieldSelect, borderColor: errors.booking && !date ? palette.danger : palette.border }} value={date} onChange={(e) => { setDate(e.target.value); clearError("booking"); }}>
               <option value="">DD / MM / YYYY</option>
               {dates.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -911,7 +908,7 @@ function Step3_Employee({ onNext, onBookingData, initialData, userEmail }) {
         </div>
         <div className="grid-1-2">
           <div>
-            <label style={fieldLabel}>Giờ khám</label>
+            <label style={fieldLabel}>Giờ khám <span style={{ color: palette.danger }}>*</span></label>
             <select style={{ ...fieldSelect, borderColor: errors.booking && !time ? palette.danger : palette.border }} value={time} onChange={(e) => { setTime(e.target.value); clearError("booking"); }}>
               <option value="">Chọn khung giờ khám</option>
               {CONFIG.timeSlots.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -1002,10 +999,11 @@ function Step3_Employee({ onNext, onBookingData, initialData, userEmail }) {
 
 function Step5_Confirmation({ bookingData, onReset, onEdit }) {
   const emp = bookingData.employee;
-  const [emailStatus, setEmailStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
+  const [emailStatus, setEmailStatus] = useState(null);
+  const [pdfError, setPdfError] = useState(false);
 
   useEffect(() => {
-    if (emailStatus !== null) return; // only send once
+    if (emailStatus !== null) return;
     setEmailStatus('sending');
     fetch('/api/send-email', {
       method: 'POST',
@@ -1021,6 +1019,80 @@ function Step5_Confirmation({ bookingData, onReset, onEdit }) {
       .then((data) => setEmailStatus(data.success ? 'sent' : 'error'))
       .catch(() => setEmailStatus('error'));
   }, []);
+
+  const handleDownloadPdf = () => {
+    try {
+      setPdfError(false);
+      const pdfContent = `
+        <html><head><meta charset="UTF-8"/>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1E293B; max-width: 700px; margin: 0 auto; }
+          .header { text-align: center; margin-bottom: 32px; }
+          .header h1 { color: #00adee; font-size: 22px; margin: 0 0 4px; }
+          .header p { color: #64748B; font-size: 14px; margin: 0; }
+          .check { width: 60px; height: 60px; border-radius: 50%; background: #00adee; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+          .check svg { width: 30px; height: 30px; }
+          .card { border: 1px solid #E2E8F0; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+          .section-bar { border-left: 3px solid #00adee; padding-left: 12px; margin-bottom: 16px; font-weight: 700; font-size: 14px; }
+          .row { display: flex; gap: 24px; margin-bottom: 12px; flex-wrap: wrap; }
+          .field { flex: 1; min-width: 150px; }
+          .field-label { font-size: 11px; color: #64748B; margin-bottom: 2px; }
+          .field-value { font-size: 14px; font-weight: 600; }
+          .divider { border-top: 1px solid #E2E8F0; padding-top: 20px; margin-top: 8px; }
+          .footer { text-align: center; margin-top: 32px; padding-top: 20px; border-top: 1px solid #E2E8F0; color: #64748B; font-size: 12px; }
+        </style></head><body>
+        <div class="header">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#FFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h1>Đặt lịch hẹn thành công!</h1>
+          <p>Mã lịch hẹn <strong>${bookingData.bookingId}</strong></p>
+        </div>
+        <div class="card">
+          <div class="section-bar">Thông tin cá nhân</div>
+          <div class="row">
+            <div class="field"><div class="field-label">Gói đăng ký:</div><div class="field-value">${CONFIG.packages.employee.label}</div></div>
+            <div class="field"><div class="field-label">Họ Tên:</div><div class="field-value">${emp.name}</div></div>
+            <div class="field"><div class="field-label">Mã nhân viên:</div><div class="field-value">${emp.employeeId}</div></div>
+          </div>
+          <div class="row">
+            <div class="field"><div class="field-label">Email:</div><div class="field-value">${emp.email}</div></div>
+            <div class="field"><div class="field-label">Ngày sinh:</div><div class="field-value">${emp.dob}</div></div>
+            <div class="field"><div class="field-label">Giới tính:</div><div class="field-value">${emp.gender.toUpperCase()}</div></div>
+          </div>
+          <div class="divider">
+            <div class="section-bar">Thông tin lịch khám</div>
+            <div class="row">
+              <div class="field"><div class="field-label">Tỉnh/Thành phố:</div><div class="field-value">${emp.city}</div></div>
+              <div class="field"><div class="field-label">Bệnh viện/Phòng khám:</div><div class="field-value">${emp.hospital}</div></div>
+            </div>
+            <div class="row">
+              <div class="field"><div class="field-label">Ngày hẹn:</div><div class="field-value">${emp.date}</div></div>
+              <div class="field"><div class="field-label">Giờ khám:</div><div class="field-value">${emp.time}</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <p>Liên hệ hỗ trợ: <strong>1900 5118</strong> | Email <strong>info@whitecoat.vn</strong></p>
+          <p>CÔNG TY TNHH WHITECOAT VIỆT NAM</p>
+        </div>
+        </body></html>
+      `;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        setPdfError(true);
+        return;
+      }
+      printWindow.document.write(pdfContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 300);
+      };
+    } catch {
+      setPdfError(true);
+    }
+  };
 
   const fieldPair = (label, value) => (
     <div style={{ marginBottom: 12 }}>
@@ -1144,9 +1216,17 @@ function Step5_Confirmation({ bookingData, onReset, onEdit }) {
         </button>
       </div>
 
-      <p style={{ textAlign: "center", fontSize: 14, color: palette.textMuted, marginBottom: 40, cursor: "pointer", fontFamily: font, textDecoration: "underline" }}>
+      <p
+        onClick={handleDownloadPdf}
+        style={{ textAlign: "center", fontSize: 14, color: palette.primary, marginBottom: 8, cursor: "pointer", fontFamily: font, textDecoration: "underline" }}
+      >
         Tải thông tin lịch hẹn
       </p>
+      {pdfError && (
+        <p style={{ textAlign: "center", fontSize: 13, color: palette.warning, fontFamily: font, marginBottom: 40, fontWeight: 500 }}>
+          ⚠ Giao diện demo chưa hỗ trợ tính năng này, mong anh/chị thử lại sau
+        </p>
+      )}
     </div>
   );
 }
